@@ -47,11 +47,11 @@ namespace AppConsult
                     return new OkObjectResult((SkillResponse) null);
                 }
 
-                const string rss = "https://blogs.msdn.microsoft.com/appconsult/feed/";
+                const string rss = "https://techcommunity.microsoft.com/gxcuf89792/plugins/custom/microsoft/o365/custom-blog-rss?board=WindowsDevAppConsult&label=&messages=&size=10";
 
                 var news = await ParseFeed(rss);
 
-                var output = $"The title of the last article is {news.FirstOrDefault()}";
+                var output = $"The title of the last article is \"{news.FirstOrDefault()}\"";
 
                 response = ResponseBuilder.Tell(output);
             }
