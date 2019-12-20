@@ -13,6 +13,7 @@ using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Logging;
+using Microsoft.SyndicationFeed;
 using Microsoft.SyndicationFeed.Rss;
 using Newtonsoft.Json;
 
@@ -20,6 +21,8 @@ namespace AppConsult
 {
     public static class Alexa
     {
+        private const string rssFeed = "https://techcommunity.microsoft.com/gxcuf89792/plugins/custom/microsoft/o365/custom-blog-rss?board=WindowsDevAppConsult&label=&messages=&size=10";
+
         [FunctionName("Alexa")]
         public static async Task<IActionResult> Run(
             [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = null)] HttpRequest req,
@@ -27,36 +30,64 @@ namespace AppConsult
         {
             var json = await req.ReadAsStringAsync();
             var skillRequest = JsonConvert.DeserializeObject<SkillRequest>(json);
-
             var requestType = skillRequest.GetRequestType();
 
-            SkillResponse response = null;
-
-            if (requestType == typeof(LaunchRequest))
+            if (IsRequestType<LaunchRequest>(requestType))
             {
-                response = ResponseBuilder.Tell("Welcome to AppConsult!");
-                response.Response.ShouldEndSession = false;
+                return new OkObjectResult(CreateLaunchResponse());
             }
 
-            else if (requestType == typeof(IntentRequest))
+            if (IsNotRequestType<IntentRequest>(requestType))
             {
-                var intentRequest = skillRequest.Request as IntentRequest;
-
-                if (intentRequest?.Intent.Name != "LastPosts")
-                {
-                    return new OkObjectResult((SkillResponse) null);
-                }
-
-                const string rss = "https://techcommunity.microsoft.com/gxcuf89792/plugins/custom/microsoft/o365/custom-blog-rss?board=WindowsDevAppConsult&label=&messages=&size=10";
-
-                var news = await ParseFeed(rss);
-
-                var output = $"The title of the last article is \"{news.FirstOrDefault()}\"";
-
-                response = ResponseBuilder.Tell(output);
+                return new OkObjectResult(null);
             }
+
+            if (IntentDoesNotMatch("LastPosts", skillRequest))
+            {
+                return new OkObjectResult(null);
+            }
+
+            var response = await CreateLastPostIntentResponse();
 
             return new OkObjectResult(response);
+        }
+
+        private static bool IsRequestType<TIntentType>(
+            Type requestType) where TIntentType : class
+        {
+            return requestType == typeof(TIntentType);
+        }
+
+        private static bool IsNotRequestType<TIntentType>(
+            Type requestType) where TIntentType : class
+        {
+            return requestType != typeof(TIntentType);
+        }
+
+        private static bool IntentDoesNotMatch(
+            string intentName,
+            SkillRequest skillRequest)
+        {
+            var intentRequest = skillRequest.Request as IntentRequest;
+
+            return intentRequest?.Intent.Name != intentName;
+        }
+
+        private static async Task<SkillResponse> CreateLastPostIntentResponse()
+        {
+            var news = await ParseFeed(rssFeed);
+
+            var output = ConstructFeedOutput(news);
+
+            var response = ResponseBuilder.Tell(output);
+            return response;
+        }
+
+        private static SkillResponse CreateLaunchResponse()
+        {
+            var response = ResponseBuilder.Tell("Welcome to AppConsult!");
+            response.Response.ShouldEndSession = false;
+            return response;
         }
 
         private static async Task<List<string>> ParseFeed(string url)
@@ -68,7 +99,7 @@ namespace AppConsult
                 var feedReader = new RssFeedReader(xmlReader);
                 while (await feedReader.Read())
                 {
-                    if (feedReader.ElementType != Microsoft.SyndicationFeed.SyndicationElementType.Item)
+                    if (IsNotFeedItem(feedReader))
                     {
                         continue;
                     }
@@ -79,6 +110,18 @@ namespace AppConsult
             }
 
             return news;
+        }
+
+        private static bool IsNotFeedItem(
+            ISyndicationFeedReader feedReader)
+        {
+            return feedReader.ElementType != SyndicationElementType.Item;
+        }
+
+        private static string ConstructFeedOutput(
+            IEnumerable<string> news)
+        {
+            return $"The title of the last article is \"{news.FirstOrDefault()}\"";
         }
     }
 }
