@@ -8,6 +8,7 @@ using Alexa.NET;
 using Alexa.NET.Request;
 using Alexa.NET.Request.Type;
 using Alexa.NET.Response;
+using AppConsult.Extensions;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Azure.WebJobs;
 using Microsoft.Azure.WebJobs.Extensions.Http;
@@ -25,24 +26,22 @@ namespace AppConsult
 
         [FunctionName("Alexa")]
         public static async Task<IActionResult> Run(
-            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = null)] HttpRequest req,
+            [HttpTrigger(AuthorizationLevel.Anonymous, "post", Route = null)] HttpRequest request,
             ILogger log)
         {
-            var json = await req.ReadAsStringAsync();
-            var skillRequest = JsonConvert.DeserializeObject<SkillRequest>(json);
-            var requestType = skillRequest.GetRequestType();
+            var skillRequest = await request.DeserializeSkillRequest();
 
-            if (IsRequestType<LaunchRequest>(requestType))
+            if (skillRequest.IsRequestType<LaunchRequest>())
             {
-                return new OkObjectResult(CreateLaunchResponse());
+                return new OkObjectResult(CreateLaunchResponse("Welcome to AppConsult!"));
             }
 
-            if (IsNotRequestType<IntentRequest>(requestType))
+            if (skillRequest.IsNotRequestType<IntentRequest>())
             {
                 return new OkObjectResult(null);
             }
 
-            if (IntentDoesNotMatch("LastPosts", skillRequest))
+            if (skillRequest.IntentDoesNotMatch("LastPosts"))
             {
                 return new OkObjectResult(null);
             }
@@ -50,27 +49,6 @@ namespace AppConsult
             var response = await CreateLastPostIntentResponse();
 
             return new OkObjectResult(response);
-        }
-
-        private static bool IsRequestType<TIntentType>(
-            Type requestType) where TIntentType : class
-        {
-            return requestType == typeof(TIntentType);
-        }
-
-        private static bool IsNotRequestType<TIntentType>(
-            Type requestType) where TIntentType : class
-        {
-            return requestType != typeof(TIntentType);
-        }
-
-        private static bool IntentDoesNotMatch(
-            string intentName,
-            SkillRequest skillRequest)
-        {
-            var intentRequest = skillRequest.Request as IntentRequest;
-
-            return intentRequest?.Intent.Name != intentName;
         }
 
         private static async Task<SkillResponse> CreateLastPostIntentResponse()
@@ -83,9 +61,10 @@ namespace AppConsult
             return response;
         }
 
-        private static SkillResponse CreateLaunchResponse()
+        private static SkillResponse CreateLaunchResponse(
+            string responseText)
         {
-            var response = ResponseBuilder.Tell("Welcome to AppConsult!");
+            var response = ResponseBuilder.Tell(responseText);
             response.Response.ShouldEndSession = false;
             return response;
         }
