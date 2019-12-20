@@ -10,6 +10,10 @@
         <e p="Alexa.cs" t="Include" />
         <e p="AppConsult.csproj" t="IncludeRecursive" />
         <e p="bin/Debug/netcoreapp3.0/bin" t="ExcludeRecursive" />
+        <e p="Extensions" t="Include">
+          <e p="HttpRequestExtensions.cs" t="Include" />
+          <e p="SkillRequestExtensions.cs" t="Include" />
+        </e>
         <e p="host.json" t="Include" />
         <e p="local.settings.json" t="Include" />
         <e p="obj" t="ExcludeRecursive">
